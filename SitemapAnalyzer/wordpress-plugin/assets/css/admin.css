@@ -1,0 +1,360 @@
+/**
+ * Additional Admin-specific CSS for SEO Crawler WordPress Plugin
+ * Enhances the Streamlit-style interface for WordPress admin context
+ */
+
+/* WordPress admin integration */
+.wp-admin .streamlit-container {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+}
+
+.wp-admin .streamlit-sidebar {
+    background-color: #f6f7f7;
+    border: 1px solid #c3c4c7;
+}
+
+.wp-admin .streamlit-button.primary {
+    background-color: #2271b1;
+    border-color: #2271b1;
+}
+
+.wp-admin .streamlit-button.primary:hover {
+    background-color: #135e96;
+    border-color: #135e96;
+}
+
+.wp-admin .streamlit-text-input:focus,
+.wp-admin .streamlit-number-input:focus,
+.wp-admin .streamlit-selectbox:focus {
+    border-color: #2271b1;
+    box-shadow: 0 0 0 1px #2271b1;
+}
+
+/* Admin notices integration */
+.seo-crawler-admin-notice {
+    margin: 5px 0 15px;
+    padding: 1px 12px;
+}
+
+.seo-crawler-admin-notice.notice-info {
+    border-left-color: #72aee6;
+}
+
+.seo-crawler-admin-notice.notice-success {
+    border-left-color: #00a32a;
+}
+
+.seo-crawler-admin-notice.notice-error {
+    border-left-color: #d63638;
+}
+
+/* Chart enhancements for admin */
+.chart-container {
+    border: 1px solid #c3c4c7;
+    background: #fff;
+}
+
+.simple-bar-chart {
+    padding: 15px;
+}
+
+.chart-bar {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+    gap: 15px;
+}
+
+.chart-label {
+    flex: 0 0 150px;
+    font-size: 13px;
+    color: #50575e;
+}
+
+.chart-bar-container {
+    flex: 1;
+    position: relative;
+    height: 20px;
+    background: #f6f7f7;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.chart-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #2271b1, #72aee6);
+    transition: width 0.3s ease;
+    border-radius: 3px;
+}
+
+.chart-value {
+    position: absolute;
+    right: 5px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 11px;
+    color: #50575e;
+    font-weight: 600;
+}
+
+.simple-pie-chart {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 10px;
+    padding: 15px;
+}
+
+.pie-item {
+    text-align: center;
+    padding: 10px;
+    background: #f6f7f7;
+    border-radius: 4px;
+}
+
+.pie-item .status-code {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 5px;
+}
+
+.pie-item .count {
+    font-size: 12px;
+    color: #646970;
+}
+
+/* Status code styling */
+.status-code {
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.status-2xx {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.status-3xx {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.status-4xx {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.status-5xx {
+    background: #fde2e7;
+    color: #be185d;
+}
+
+/* Table enhancements */
+.wp-admin .streamlit-table {
+    border: 1px solid #c3c4c7;
+}
+
+.wp-admin .streamlit-table th {
+    background-color: #f6f7f7;
+    border-bottom: 1px solid #c3c4c7;
+    color: #1d2327;
+}
+
+.wp-admin .streamlit-table td {
+    border-bottom: 1px solid #f0f0f1;
+}
+
+.wp-admin .streamlit-table tr:hover {
+    background-color: #f6f7f7;
+}
+
+/* Responsive improvements */
+@media screen and (max-width: 960px) {
+    .wp-admin .streamlit-layout {
+        flex-direction: column;
+    }
+    
+    .wp-admin .streamlit-sidebar {
+        flex: none;
+        margin-bottom: 20px;
+    }
+}
+
+/* Admin-specific metric cards */
+.wp-admin .metric-card {
+    border: 1px solid #c3c4c7;
+    background: #fff;
+}
+
+.wp-admin .metric-value {
+    color: #1d2327;
+}
+
+.wp-admin .metric-label {
+    color: #646970;
+}
+
+/* Loading states */
+.seo-crawler-loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.seo-crawler-loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    margin: -10px 0 0 -10px;
+    border: 2px solid #f3f4f6;
+    border-top: 2px solid #2271b1;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+/* Admin form improvements */
+.wp-admin .streamlit-form {
+    background: #fff;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+    padding: 20px;
+}
+
+.wp-admin .streamlit-info-box {
+    background-color: #f0f6fc;
+    border: 1px solid #c9d8e8;
+    border-left: 4px solid #2271b1;
+}
+
+/* Progress bar admin styling */
+.wp-admin .progress-bar {
+    background-color: #f0f0f1;
+    border: 1px solid #c3c4c7;
+    border-radius: 4px;
+}
+
+.wp-admin .progress-fill {
+    background: linear-gradient(90deg, #2271b1, #72aee6);
+}
+
+/* Critical issues admin styling */
+.wp-admin .issue-card.high {
+    border-left-color: #d63638;
+}
+
+.wp-admin .issue-card.medium {
+    border-left-color: #dba617;
+}
+
+.wp-admin .issue-card.low {
+    border-left-color: #00a32a;
+}
+
+/* Recommendations admin styling */
+.wp-admin .recommendation-card {
+    border: 1px solid #c3c4c7;
+    background: #fff;
+}
+
+.wp-admin .recommendation-priority.high {
+    background-color: #fcf0f1;
+    color: #d63638;
+}
+
+.wp-admin .recommendation-priority.medium {
+    background-color: #fcf9e8;
+    color: #dba617;
+}
+
+.wp-admin .recommendation-priority.low {
+    background-color: #f0f6fc;
+    color: #2271b1;
+}
+
+.wp-admin .recommendation-action {
+    background-color: #f6f7f7;
+    border-left-color: #2271b1;
+}
+
+/* History page specific styles */
+.crawl-sessions-table .column-cb {
+    width: 2.2em;
+}
+
+.crawl-sessions-table .domain-column {
+    width: 25%;
+}
+
+.crawl-sessions-table .status-column {
+    width: 15%;
+}
+
+.crawl-sessions-table .progress-column {
+    width: 15%;
+}
+
+.crawl-sessions-table .created-column {
+    width: 15%;
+}
+
+.crawl-sessions-table .duration-column {
+    width: 10%;
+}
+
+.crawl-sessions-table .actions-column {
+    width: 18%;
+}
+
+/* Accessibility improvements */
+.wp-admin .streamlit-button:focus {
+    box-shadow: 0 0 0 2px #2271b1;
+    outline: 2px solid transparent;
+}
+
+.wp-admin .streamlit-text-input:focus,
+.wp-admin .streamlit-selectbox:focus {
+    outline: 2px solid transparent;
+}
+
+/* Dark mode support for admin */
+@media (prefers-color-scheme: dark) {
+    .wp-admin .streamlit-sidebar {
+        background-color: #1e1e1e;
+        border-color: #3c3c3c;
+    }
+    
+    .wp-admin .streamlit-form {
+        background: #1e1e1e;
+        border-color: #3c3c3c;
+    }
+    
+    .wp-admin .chart-container,
+    .wp-admin .metric-card,
+    .wp-admin .issue-card,
+    .wp-admin .recommendation-card {
+        background: #1e1e1e;
+        border-color: #3c3c3c;
+    }
+}
+
+/* Print styles */
+@media print {
+    .wp-admin .streamlit-sidebar {
+        display: none;
+    }
+    
+    .wp-admin .streamlit-main {
+        width: 100%;
+    }
+    
+    .wp-admin .streamlit-button {
+        display: none;
+    }
+    
+    .wp-admin .chart-container {
+        page-break-inside: avoid;
+    }
+}

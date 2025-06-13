@@ -1,0 +1,385 @@
+/**
+ * SEO Crawler Pro - Admin Styles
+ */
+
+.seo-crawler-admin-container {
+    max-width: 1200px;
+    margin: 20px 0;
+}
+
+.seo-crawler-form-section {
+    background: #fff;
+    padding: 20px;
+    margin-bottom: 20px;
+    border: 1px solid #ccd0d4;
+    box-shadow: 0 1px 1px rgba(0,0,0,.04);
+}
+
+.seo-crawler-form-section h2 {
+    margin-top: 0;
+    color: #23282d;
+}
+
+.validation-message {
+    margin-top: 5px;
+}
+
+.validation-message .success {
+    color: #46b450;
+}
+
+.validation-message .error {
+    color: #dc3232;
+}
+
+/* Progress Section */
+.seo-crawler-progress {
+    background: #fff;
+    padding: 20px;
+    margin-bottom: 20px;
+    border: 1px solid #ccd0d4;
+    box-shadow: 0 1px 1px rgba(0,0,0,.04);
+}
+
+#progress-bar-container {
+    width: 100%;
+    height: 20px;
+    background-color: #f1f1f1;
+    border-radius: 10px;
+    overflow: hidden;
+    margin: 10px 0;
+}
+
+#progress-bar {
+    height: 100%;
+    background-color: #0073aa;
+    width: 0%;
+    transition: width 0.3s ease;
+}
+
+#progress-info {
+    display: flex;
+    justify-content: space-between;
+    font-size: 14px;
+    color: #666;
+}
+
+#current-url {
+    font-style: italic;
+    max-width: 50%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Results Section */
+.seo-crawler-results {
+    background: #fff;
+    padding: 20px;
+    margin-bottom: 20px;
+    border: 1px solid #ccd0d4;
+    box-shadow: 0 1px 1px rgba(0,0,0,.04);
+}
+
+.results-tabs {
+    border-bottom: 1px solid #ccd0d4;
+    margin-bottom: 20px;
+}
+
+.tab-button {
+    background: none;
+    border: none;
+    padding: 10px 20px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    font-size: 14px;
+    color: #666;
+}
+
+.tab-button.active {
+    border-bottom-color: #0073aa;
+    color: #0073aa;
+    font-weight: 600;
+}
+
+.tab-button:hover {
+    color: #0073aa;
+}
+
+.tab-panel {
+    display: none;
+}
+
+.tab-panel.active {
+    display: block;
+}
+
+/* Summary Stats */
+.summary-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.stat-box {
+    background: #f9f9f9;
+    padding: 20px;
+    border-radius: 5px;
+    text-align: center;
+    border-left: 4px solid #0073aa;
+}
+
+.stat-box h4 {
+    margin: 0 0 10px 0;
+    color: #666;
+    font-size: 14px;
+    font-weight: normal;
+}
+
+.stat-number {
+    display: block;
+    font-size: 32px;
+    font-weight: bold;
+    color: #23282d;
+}
+
+/* Export Section */
+.export-section {
+    padding: 20px 0;
+    border-top: 1px solid #eee;
+}
+
+.export-section .button {
+    margin-right: 10px;
+}
+
+/* Table Controls */
+.table-controls {
+    margin-bottom: 15px;
+    display: flex;
+    gap: 15px;
+    align-items: center;
+}
+
+.table-controls input[type="search"] {
+    width: 300px;
+}
+
+.table-controls select {
+    width: 200px;
+}
+
+/* Data Table */
+.data-table-container {
+    overflow-x: auto;
+}
+
+.data-table-container table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.data-table-container th,
+.data-table-container td {
+    padding: 8px 12px;
+    text-align: left;
+    border-bottom: 1px solid #eee;
+}
+
+.data-table-container th {
+    background: #f9f9f9;
+    font-weight: 600;
+}
+
+.data-table-container tr:hover {
+    background: #f9f9f9;
+}
+
+/* Status indicators */
+.status-200 {
+    color: #46b450;
+    font-weight: bold;
+}
+
+.status-404 {
+    color: #dc3232;
+    font-weight: bold;
+}
+
+.status-301,
+.status-302 {
+    color: #ffb900;
+    font-weight: bold;
+}
+
+/* Issues Section */
+.issues-summary {
+    margin-bottom: 30px;
+}
+
+.issue-item {
+    background: #fff3cd;
+    border: 1px solid #ffeaa7;
+    border-radius: 5px;
+    padding: 15px;
+    margin-bottom: 15px;
+}
+
+.issue-item h5 {
+    margin: 0 0 10px 0;
+    color: #856404;
+    word-break: break-all;
+}
+
+.issue-item ul {
+    margin: 0;
+    padding-left: 20px;
+    color: #856404;
+}
+
+.recommendations {
+    background: #d1ecf1;
+    border: 1px solid #bee5eb;
+    border-radius: 5px;
+    padding: 20px;
+}
+
+.recommendations h4 {
+    margin-top: 0;
+    color: #0c5460;
+}
+
+.recommendations ul {
+    margin: 0;
+    padding-left: 20px;
+    color: #0c5460;
+}
+
+/* Recent Crawls */
+.seo-crawler-recent {
+    background: #fff;
+    padding: 20px;
+    margin-bottom: 20px;
+    border: 1px solid #ccd0d4;
+    box-shadow: 0 1px 1px rgba(0,0,0,.04);
+}
+
+.recent-crawls-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.recent-crawls-list li {
+    padding: 15px;
+    border-bottom: 1px solid #eee;
+    background: #f9f9f9;
+    margin-bottom: 10px;
+    border-radius: 5px;
+}
+
+.recent-crawls-list li:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+/* Success messages */
+.success {
+    color: #46b450;
+    font-weight: bold;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .summary-stats {
+        grid-template-columns: 1fr;
+    }
+    
+    .table-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .table-controls input[type="search"],
+    .table-controls select {
+        width: 100%;
+    }
+    
+    .data-table-container {
+        font-size: 14px;
+    }
+    
+    .results-tabs {
+        overflow-x: auto;
+        white-space: nowrap;
+    }
+    
+    .tab-button {
+        display: inline-block;
+    }
+}
+
+/* WordPress Admin Integration */
+.wrap .seo-crawler-admin-container h1 {
+    margin-bottom: 20px;
+}
+
+/* Loading states */
+.spinner {
+    float: none;
+    margin: 0 5px;
+}
+
+/* Form styling improvements */
+.form-table th {
+    width: 200px;
+}
+
+.form-table td p.description {
+    font-style: italic;
+    color: #666;
+}
+
+/* Button enhancements */
+.button-primary:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+/* Accessibility improvements */
+.tab-button:focus {
+    outline: 2px solid #0073aa;
+    outline-offset: -2px;
+}
+
+.button:focus {
+    box-shadow: 0 0 0 1px #0073aa;
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+    .seo-crawler-form-section,
+    .seo-crawler-progress,
+    .seo-crawler-results,
+    .seo-crawler-recent {
+        background: #1e1e1e;
+        color: #fff;
+        border-color: #444;
+    }
+    
+    .stat-box {
+        background: #2a2a2a;
+        color: #fff;
+    }
+    
+    .issue-item {
+        background: #3a3a1a;
+        border-color: #5a5a2a;
+    }
+    
+    .recommendations {
+        background: #1a2a3a;
+        border-color: #2a3a4a;
+    }
+}
