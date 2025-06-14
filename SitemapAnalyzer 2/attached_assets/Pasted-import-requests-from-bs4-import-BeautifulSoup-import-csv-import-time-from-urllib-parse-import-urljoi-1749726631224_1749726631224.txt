@@ -1,0 +1,765 @@
+import requests
+from bs4 import BeautifulSoup
+import csv
+import time
+from urllib.parse import urljoin, urlparse
+import json
+import re
+from datetime import datetime
+import hashlib
+from collections import Counter
+
+class ComprehensiveSEOCrawler:
+    def __init__(self, sitemap_url, delay=1):
+        self.sitemap_url = sitemap_url
+        self.delay = delay
+        self.session = requests.Session()
+        self.session.headers.update({
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        })
+        self.all_titles = []  # For duplicate detection
+        self.all_meta_descriptions = []
+        self.all_h1s = []
+        self.redirect_chains = {}
+    
+    def fetch_sitemap_urls(self):
+        """Extract URLs from XML sitemap with last modified dates"""
+        try:
+            response = self.session.get(self.sitemap_url)
+            response.raise_for_status()
+            
+            soup = BeautifulSoup(response.content, 'xml')
+            urls_data = []
+            
+            # Handle regular sitemap
+            for url_tag in soup.find_all('url'):
+                loc = url_tag.find('loc')
+                if loc:
+                    url_data = {'url': loc.text.strip()}
+                    
+                    # Get last modified from sitemap
+                    lastmod = url_tag.find('lastmod')
+                    if lastmod:
+                        url_data['sitemap_lastmod'] = lastmod.text.strip()
+                    
+                    # Get priority and changefreq
+                    priority = url_tag.find('priority')
+                    if priority:
+                        url_data['sitemap_priority'] = priority.text.strip()
+                    
+                    changefreq = url_tag.find('changefreq')
+                    if changefreq:
+                        url_data['sitemap_changefreq'] = changefreq.text.strip()
+                    
+                    urls_data.append(url_data)
+            
+            print(f"Found {len(urls_data)} URLs in sitemap")
+            return urls_data
+            
+        except Exception as e:
+            print(f"Error fetching sitemap: {e}")
+            return []
+    
+    def check_redirect_chain(self, url):
+        """Follow redirect chain and return chain info"""
+        try:
+            redirect_chain = []
+            current_url = url
+            
+            # Don't follow redirects automatically
+            response = self.session.get(current_url, allow_redirects=False, timeout=10)
+            
+            while response.status_code in [301, 302, 303, 307, 308]:
+                redirect_chain.append({
+                    'url': current_url,
+                    'status': response.status_code,
+                    'redirect_type': 'permanent' if response.status_code == 301 else 'temporary'
+                })
+                
+                # Get redirect location
+                location = response.headers.get('Location')
+                if not location:
+                    break
+                
+                # Handle relative redirects
+                if location.startswith('/'):
+                    parsed_url = urlparse(current_url)
+                    current_url = f"{parsed_url.scheme}://{parsed_url.netloc}{location}"
+                else:
+                    current_url = location
+                
+                # Prevent infinite loops
+                if len(redirect_chain) > 10:
+                    break
+                
+                response = self.session.get(current_url, allow_redirects=False, timeout=10)
+            
+            # Final destination
+            if redirect_chain:
+                redirect_chain.append({
+                    'url': current_url,
+                    'status': response.status_code,
+                    'redirect_type': 'final'
+                })
+            
+            return {
+                'has_redirects': len(redirect_chain) > 0,
+                'redirect_count': len(redirect_chain) - 1 if redirect_chain else 0,
+                'redirect_chain': redirect_chain,
+                'final_url': current_url,
+                'final_status': response.status_code
+            }
+            
+        except Exception as e:
+            return {
+                'has_redirects': False,
+                'redirect_count': 0,
+                'redirect_chain': [],
+                'final_url': url,
+                'final_status': 'ERROR',
+                'redirect_error': str(e)
+            }
+    
+    def extract_dates(self, soup, url):
+        """Extract published and modified dates from various sources"""
+        dates = {
+            'date_published': '',
+            'date_modified': '',
+            'date_source': ''
+        }
+        
+        # Try Schema.org structured data first
+        schema_scripts = soup.find_all('script', type='application/ld+json')
+        for script in schema_scripts:
+            try:
+                schema_data = json.loads(script.string)
+                if isinstance(schema_data, dict):
+                    if 'datePublished' in schema_data:
+                        dates['date_published'] = schema_data['datePublished']
+                        dates['date_source'] = 'schema'
+                    if 'dateModified' in schema_data:
+                        dates['date_modified'] = schema_data['dateModified']
+                        if not dates['date_source']:
+                            dates['date_source'] = 'schema'
+            except:
+                pass
+        
+        # Try Open Graph dates
+        if not dates['date_published']:
+            og_published = soup.find('meta', attrs={'property': 'article:published_time'})
+            if og_published:
+                dates['date_published'] = og_published.get('content', '')
+                dates['date_source'] = 'opengraph'
+        
+        if not dates['date_modified']:
+            og_modified = soup.find('meta', attrs={'property': 'article:modified_time'})
+            if og_modified:
+                dates['date_modified'] = og_modified.get('content', '')
+                if not dates['date_source']:
+                    dates['date_source'] = 'opengraph'
+        
+        # Try WordPress/CMS specific meta tags
+        if not dates['date_published']:
+            wp_published = soup.find('meta', attrs={'name': 'article:published_time'})
+            if wp_published:
+                dates['date_published'] = wp_published.get('content', '')
+                dates['date_source'] = 'meta'
+        
+        # Try to find dates in text content (less reliable)
+        if not dates['date_published']:
+            time_tags = soup.find_all('time')
+            for time_tag in time_tags:
+                datetime_attr = time_tag.get('datetime')
+                if datetime_attr and ('published' in time_tag.get('class', []) or 'pubdate' in time_tag.get('class', [])):
+                    dates['date_published'] = datetime_attr
+                    dates['date_source'] = 'html_time'
+                    break
+        
+        return dates
+    
+    def analyze_content_quality(self, soup):
+        """Analyze content quality metrics"""
+        body = soup.find('body')
+        if not body:
+            return {}
+        
+        text = body.get_text()
+        
+        # Reading level approximation (Flesch Reading Ease)
+        sentences = len(re.findall(r'[.!?]+', text))
+        words = len(text.split())
+        syllables = sum([self.count_syllables(word) for word in text.split()])
+        
+        if sentences > 0 and words > 0:
+            flesch_score = 206.835 - (1.015 * (words / sentences)) - (84.6 * (syllables / words))
+        else:
+            flesch_score = 0
+        
+        # Content structure analysis
+        paragraphs = len(soup.find_all('p'))
+        lists = len(soup.find_all(['ul', 'ol']))
+        tables = len(soup.find_all('table'))
+        
+        return {
+            'word_count': words,
+            'sentence_count': sentences,
+            'paragraph_count': paragraphs,
+            'list_count': lists,
+            'table_count': tables,
+            'flesch_reading_ease': round(flesch_score, 2) if flesch_score else 0,
+            'avg_words_per_sentence': round(words / sentences, 2) if sentences > 0 else 0
+        }
+    
+    def count_syllables(self, word):
+        """Simple syllable counter"""
+        word = word.lower()
+        count = 0
+        vowels = "aeiouy"
+        if word[0] in vowels:
+            count += 1
+        for index in range(1, len(word)):
+            if word[index] in vowels and word[index - 1] not in vowels:
+                count += 1
+        if word.endswith("e"):
+            count -= 1
+        if count == 0:
+            count += 1
+        return count
+    
+    def check_technical_seo(self, soup, response):
+        """Check technical SEO factors"""
+        tech_data = {}
+        
+        # SSL check
+        tech_data['is_https'] = response.url.startswith('https://')
+        
+        # Check for AMP
+        amp_link = soup.find('link', rel='amphtml')
+        tech_data['has_amp'] = bool(amp_link)
+        if amp_link:
+            tech_data['amp_url'] = amp_link.get('href', '')
+        
+        # Mobile viewport
+        viewport = soup.find('meta', attrs={'name': 'viewport'})
+        tech_data['has_viewport'] = bool(viewport)
+        if viewport:
+            tech_data['viewport_content'] = viewport.get('content', '')
+        
+        # Favicon check
+        favicon = soup.find('link', rel=['icon', 'shortcut icon'])
+        tech_data['has_favicon'] = bool(favicon)
+        
+        # Check for social media meta tags completeness
+        social_tags = {
+            'og:title': soup.find('meta', attrs={'property': 'og:title'}),
+            'og:description': soup.find('meta', attrs={'property': 'og:description'}),
+            'og:image': soup.find('meta', attrs={'property': 'og:image'}),
+            'twitter:card': soup.find('meta', attrs={'name': 'twitter:card'})
+        }
+        
+        tech_data['social_tags_complete'] = all(tag for tag in social_tags.values())
+        tech_data['missing_social_tags'] = [key for key, tag in social_tags.items() if not tag]
+        
+        # Check for hreflang
+        hreflang_links = soup.find_all('link', rel='alternate', hreflang=True)
+        tech_data['has_hreflang'] = len(hreflang_links) > 0
+        tech_data['hreflang_count'] = len(hreflang_links)
+        
+        return tech_data
+    
+    def extract_page_data(self, url_data):
+        """Extract comprehensive SEO data from a single page"""
+        url = url_data.get('url') if isinstance(url_data, dict) else url_data
+        
+        start_time = time.time()
+        
+        # Check redirect chain first
+        redirect_info = self.check_redirect_chain(url)
+        final_url = redirect_info['final_url']
+        
+        try:
+            # Use final URL for content analysis
+            response = self.session.get(final_url, timeout=15)
+            load_time = round((time.time() - start_time) * 1000, 2)  # in milliseconds
+            
+            soup = BeautifulSoup(response.content, 'html.parser')
+            
+            # Initialize data structure
+            data = {
+                'original_url': url,
+                'final_url': final_url,
+                'status_code': response.status_code,
+                'load_time_ms': load_time,
+                'response_size_kb': round(len(response.content) / 1024, 2),
+                'content_type': response.headers.get('content-type', ''),
+                
+                # Redirect information
+                'has_redirects': redirect_info['has_redirects'],
+                'redirect_count': redirect_info['redirect_count'],
+                'redirect_type': redirect_info['redirect_chain'][0]['redirect_type'] if redirect_info['redirect_chain'] else '',
+                
+                # Sitemap data
+                'sitemap_lastmod': url_data.get('sitemap_lastmod', '') if isinstance(url_data, dict) else '',
+                'sitemap_priority': url_data.get('sitemap_priority', '') if isinstance(url_data, dict) else '',
+                'sitemap_changefreq': url_data.get('sitemap_changefreq', '') if isinstance(url_data, dict) else '',
+                
+                # Basic SEO elements
+                'title': '',
+                'title_length': 0,
+                'meta_description': '',
+                'meta_description_length': 0,
+                'meta_keywords': '',
+                'h1': '',
+                'h1_length': 0,
+                'h1_count': 0,
+                'h2_count': 0,
+                'h3_count': 0,
+                'h4_count': 0,
+                'h5_count': 0,
+                'h6_count': 0,
+                
+                # Duplicate content flags
+                'title_equals_h1': False,
+                'title_duplicate': False,
+                'h1_duplicate': False,
+                'meta_desc_duplicate': False,
+                
+                # Language and localization
+                'lang_attribute': '',
+                'lang_in_html': False,
+                'hreflang_present': False,
+                'hreflang_count': 0,
+                
+                # Technical SEO
+                'canonical_url': '',
+                'canonical_self_referencing': False,
+                'robots_meta': '',
+                'robots_noindex': False,
+                'robots_nofollow': False,
+                'is_https': False,
+                'has_viewport': False,
+                'viewport_content': '',
+                'has_favicon': False,
+                'has_amp': False,
+                'amp_url': '',
+                
+                # Content analysis
+                'word_count': 0,
+                'sentence_count': 0,
+                'paragraph_count': 0,
+                'list_count': 0,
+                'table_count': 0,
+                'flesch_reading_ease': 0,
+                'avg_words_per_sentence': 0,
+                
+                # Link analysis
+                'internal_links': 0,
+                'external_links': 0,
+                'total_links': 0,
+                'links_without_text': 0,
+                
+                # Image analysis
+                'total_images': 0,
+                'images_without_alt': 0,
+                'images_with_empty_alt': 0,
+                'images_over_100kb': 0,
+                
+                # Social media
+                'og_title': '',
+                'og_description': '',
+                'og_image': '',
+                'twitter_title': '',
+                'twitter_description': '',
+                'twitter_card': '',
+                'social_tags_complete': False,
+                'missing_social_tags': '',
+                
+                # Dates
+                'date_published': '',
+                'date_modified': '',
+                'date_source': '',
+                
+                # Schema.org
+                'schema_types': '',
+                'has_structured_data': False,
+                
+                # Issues found
+                'seo_issues': [],
+                'warnings': [],
+                
+                'crawl_timestamp': datetime.now().isoformat()
+            }
+            
+            # Extract basic elements
+            title_tag = soup.find('title')
+            if title_tag:
+                data['title'] = title_tag.get_text().strip()
+                data['title_length'] = len(data['title'])
+            
+            meta_desc = soup.find('meta', attrs={'name': 'description'})
+            if meta_desc:
+                data['meta_description'] = meta_desc.get('content', '').strip()
+                data['meta_description_length'] = len(data['meta_description'])
+            
+            meta_keywords = soup.find('meta', attrs={'name': 'keywords'})
+            if meta_keywords:
+                data['meta_keywords'] = meta_keywords.get('content', '').strip()
+            
+            # H1 analysis
+            h1_tags = soup.find_all('h1')
+            data['h1_count'] = len(h1_tags)
+            if h1_tags:
+                data['h1'] = h1_tags[0].get_text().strip()
+                data['h1_length'] = len(data['h1'])
+            
+            # Heading structure
+            for i in range(2, 7):
+                data[f'h{i}_count'] = len(soup.find_all(f'h{i}'))
+            
+            # Duplicate content checks
+            data['title_equals_h1'] = data['title'].lower() == data['h1'].lower() if data['title'] and data['h1'] else False
+            
+            # Store for duplicate detection across pages
+            if data['title']:
+                self.all_titles.append(data['title'])
+            if data['meta_description']:
+                self.all_meta_descriptions.append(data['meta_description'])
+            if data['h1']:
+                self.all_h1s.append(data['h1'])
+            
+            # Language analysis
+            html_tag = soup.find('html')
+            if html_tag:
+                lang = html_tag.get('lang', '').strip()
+                data['lang_attribute'] = lang
+                data['lang_in_html'] = bool(lang)
+            
+            # Technical SEO checks
+            tech_data = self.check_technical_seo(soup, response)
+            data.update(tech_data)
+            
+            # Canonical URL
+            canonical = soup.find('link', attrs={'rel': 'canonical'})
+            if canonical:
+                data['canonical_url'] = canonical.get('href', '').strip()
+                data['canonical_self_referencing'] = data['canonical_url'] == final_url
+            
+            # Robots meta
+            robots_meta = soup.find('meta', attrs={'name': 'robots'})
+            if robots_meta:
+                robots_content = robots_meta.get('content', '').lower()
+                data['robots_meta'] = robots_content
+                data['robots_noindex'] = 'noindex' in robots_content
+                data['robots_nofollow'] = 'nofollow' in robots_content
+            
+            # Content analysis
+            content_data = self.analyze_content_quality(soup)
+            data.update(content_data)
+            
+            # Date extraction
+            date_data = self.extract_dates(soup, final_url)
+            data.update(date_data)
+            
+            # Link analysis
+            base_domain = urlparse(final_url).netloc
+            all_links = soup.find_all('a', href=True)
+            data['total_links'] = len(all_links)
+            
+            for link in all_links:
+                href = link['href']
+                link_text = link.get_text().strip()
+                
+                if not link_text:
+                    data['links_without_text'] += 1
+                
+                if href.startswith('http'):
+                    link_domain = urlparse(href).netloc
+                    if link_domain == base_domain:
+                        data['internal_links'] += 1
+                    else:
+                        data['external_links'] += 1
+                elif href.startswith('/') or href.startswith('./'):
+                    data['internal_links'] += 1
+            
+            # Image analysis
+            images = soup.find_all('img')
+            data['total_images'] = len(images)
+            
+            for img in images:
+                alt_text = img.get('alt')
+                if alt_text is None:
+                    data['images_without_alt'] += 1
+                elif alt_text.strip() == '':
+                    data['images_with_empty_alt'] += 1
+            
+            # Social media tags
+            og_title = soup.find('meta', attrs={'property': 'og:title'})
+            if og_title:
+                data['og_title'] = og_title.get('content', '').strip()
+            
+            og_desc = soup.find('meta', attrs={'property': 'og:description'})
+            if og_desc:
+                data['og_description'] = og_desc.get('content', '').strip()
+            
+            og_image = soup.find('meta', attrs={'property': 'og:image'})
+            if og_image:
+                data['og_image'] = og_image.get('content', '').strip()
+            
+            twitter_title = soup.find('meta', attrs={'name': 'twitter:title'})
+            if twitter_title:
+                data['twitter_title'] = twitter_title.get('content', '').strip()
+            
+            twitter_desc = soup.find('meta', attrs={'name': 'twitter:description'})
+            if twitter_desc:
+                data['twitter_description'] = twitter_desc.get('content', '').strip()
+            
+            twitter_card = soup.find('meta', attrs={'name': 'twitter:card'})
+            if twitter_card:
+                data['twitter_card'] = twitter_card.get('content', '').strip()
+            
+            data['missing_social_tags'] = ', '.join(data.get('missing_social_tags', []))
+            
+            # Schema.org structured data
+            schema_scripts = soup.find_all('script', type='application/ld+json')
+            schema_types = []
+            
+            for script in schema_scripts:
+                try:
+                    schema_data = json.loads(script.string)
+                    if isinstance(schema_data, dict) and '@type' in schema_data:
+                        schema_types.append(schema_data['@type'])
+                    elif isinstance(schema_data, list):
+                        for item in schema_data:
+                            if isinstance(item, dict) and '@type' in item:
+                                schema_types.append(item['@type'])
+                except:
+                    pass
+            
+            data['schema_types'] = ', '.join(set(schema_types))
+            data['has_structured_data'] = len(schema_types) > 0
+            
+            # SEO Issues Detection
+            issues = []
+            warnings = []
+            
+            # Critical issues
+            if not data['title']:
+                issues.append('Missing title tag')
+            elif data['title_length'] > 60:
+                warnings.append(f'Title too long ({data["title_length"]} chars)')
+            elif data['title_length'] < 30:
+                warnings.append(f'Title too short ({data["title_length"]} chars)')
+            
+            if not data['meta_description']:
+                issues.append('Missing meta description')
+            elif data['meta_description_length'] > 160:
+                warnings.append(f'Meta description too long ({data["meta_description_length"]} chars)')
+            elif data['meta_description_length'] < 120:
+                warnings.append(f'Meta description too short ({data["meta_description_length"]} chars)')
+            
+            if data['h1_count'] == 0:
+                issues.append('Missing H1 tag')
+            elif data['h1_count'] > 1:
+                issues.append(f'Multiple H1 tags ({data["h1_count"]})')
+            
+            if not data['lang_in_html']:
+                issues.append('Missing lang attribute in HTML tag')
+            
+            if not data['canonical_url']:
+                warnings.append('Missing canonical URL')
+            
+            if data['robots_noindex']:
+                warnings.append('Page has noindex directive')
+            
+            if not data['is_https']:
+                issues.append('Not using HTTPS')
+            
+            if not data['has_viewport']:
+                issues.append('Missing viewport meta tag')
+            
+            if data['images_without_alt'] > 0:
+                warnings.append(f'{data["images_without_alt"]} images without alt text')
+            
+            if data['load_time_ms'] > 3000:
+                warnings.append(f'Slow page load time ({data["load_time_ms"]}ms)')
+            
+            if data['word_count'] < 300:
+                warnings.append(f'Low word count ({data["word_count"]} words)')
+            
+            data['seo_issues'] = '; '.join(issues)
+            data['warnings'] = '; '.join(warnings)
+            
+            return data
+            
+        except Exception as e:
+            print(f"Error processing {url}: {e}")
+            return {
+                'original_url': url,
+                'final_url': final_url,
+                'status_code': 'ERROR',
+                'load_time_ms': round((time.time() - start_time) * 1000, 2),
+                'error': str(e),
+                'crawl_timestamp': datetime.now().isoformat()
+            }
+    
+    def detect_duplicates(self, all_data):
+        """Post-process to detect duplicate content across pages"""
+        # Count occurrences
+        title_counts = Counter(self.all_titles)
+        desc_counts = Counter(self.all_meta_descriptions)
+        h1_counts = Counter(self.all_h1s)
+        
+        # Mark duplicates
+        for data in all_data:
+            if data.get('title') and title_counts[data['title']] > 1:
+                data['title_duplicate'] = True
+            
+            if data.get('meta_description') and desc_counts[data['meta_description']] > 1:
+                data['meta_desc_duplicate'] = True
+            
+            if data.get('h1') and h1_counts[data['h1']] > 1:
+                data['h1_duplicate'] = True
+        
+        return all_data
+    
+    def crawl_and_export(self, output_file='comprehensive_seo_audit.csv'):
+        """Main method to crawl all URLs and export comprehensive SEO data"""
+        urls_data = self.fetch_sitemap_urls()
+        
+        if not urls_data:
+            print("No URLs found in sitemap")
+            return
+        
+        all_data = []
+        
+        for i, url_data in enumerate(urls_data, 1):
+            url = url_data.get('url') if isinstance(url_data, dict) else url_data
+            print(f"Processing {i}/{len(urls_data)}: {url}")
+            
+            page_data = self.extract_page_data(url_data)
+            all_data.append(page_data)
+            
+            # Be respectful with delays
+            if i < len(urls_data):
+                time.sleep(self.delay)
+        
+        # Detect duplicates across all pages
+        all_data = self.detect_duplicates(all_data)
+        
+        # Export to CSV
+        if all_data:
+            fieldnames = [
+                # Basic info
+                'original_url', 'final_url', 'status_code', 'load_time_ms', 'response_size_kb', 'content_type',
+                
+                # Redirects
+                'has_redirects', 'redirect_count', 'redirect_type',
+                
+                # Sitemap data
+                'sitemap_lastmod', 'sitemap_priority', 'sitemap_changefreq',
+                
+                # Title and meta
+                'title', 'title_length', 'meta_description', 'meta_description_length', 'meta_keywords',
+                
+                # Headings
+                'h1', 'h1_length', 'h1_count', 'h2_count', 'h3_count', 'h4_count', 'h5_count', 'h6_count',
+                
+                # Duplicates
+                'title_equals_h1', 'title_duplicate', 'h1_duplicate', 'meta_desc_duplicate',
+                
+                # Language
+                'lang_attribute', 'lang_in_html', 'hreflang_present', 'hreflang_count',
+                
+                # Technical SEO
+                'canonical_url', 'canonical_self_referencing', 'robots_meta', 'robots_noindex', 'robots_nofollow',
+                'is_https', 'has_viewport', 'viewport_content', 'has_favicon', 'has_amp', 'amp_url',
+                
+                # Content quality
+                'word_count', 'sentence_count', 'paragraph_count', 'list_count', 'table_count',
+                'flesch_reading_ease', 'avg_words_per_sentence',
+                
+                # Links
+                'internal_links', 'external_links', 'total_links', 'links_without_text',
+                
+                # Images
+                'total_images', 'images_without_alt', 'images_with_empty_alt', 'images_over_100kb',
+                
+                # Social media
+                'og_title', 'og_description', 'og_image', 'twitter_title', 'twitter_description', 'twitter_card',
+                'social_tags_complete', 'missing_social_tags',
+                
+                # Dates
+                'date_published', 'date_modified', 'date_source',
+                
+                # Schema
+                'schema_types', 'has_structured_data',
+                
+                # Issues
+                'seo_issues', 'warnings',
+                
+                # Meta
+                'crawl_timestamp', 'error'
+            ]
+            
+            with open(output_file, 'w', newline='', encoding='utf-8') as csvfile:
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                writer.writeheader()
+                
+                for row in all_data:
+                    # Ensure all fieldnames are present
+                    clean_row = {field: row.get(field, '') for field in fieldnames}
+                    writer.writerow(clean_row)
+            
+            print(f"\nComprehensive SEO audit complete!")
+            print(f"Data exported to {output_file}")
+            print(f"Processed {len(all_data)} pages")
+            
+            # Summary statistics
+            issues_count = sum(1 for data in all_data if data.get('seo_issues'))
+            warnings_count = sum(1 for data in all_data if data.get('warnings'))
+            redirects_count = sum(1 for data in all_data if data.get('has_redirects'))
+            duplicate_titles = sum(1 for data in all_data if data.get('title_duplicate'))
+            
+            print(f"\nSummary:")
+            print(f"- Pages with SEO issues: {issues_count}")
+            print(f"- Pages with warnings: {warnings_count}")
+            print(f"- Pages with redirects: {redirects_count}")
+            print(f"- Pages with duplicate titles: {duplicate_titles}")
+            
+        else:
+            print("No data to export")
+
+# Usage
+if __name__ == "__main__":
+    sitemap_url = "https://aerocoat.com/wp-sitemap-posts-page-1.xml"
+    
+    # Generate filename based on domain
+    from urllib.parse import urlparse
+    domain = urlparse(sitemap_url).netloc.replace('www.', '')
+    output_filename = f"{domain.replace('.', '_')}_comprehensive_seo_audit.csv"
+    
+    # Initialize crawler with 1-second delay between requests
+    crawler = ComprehensiveSEOCrawler(sitemap_url, delay=1)
+    
+    # Start the comprehensive crawl
+    crawler.crawl_and_export(output_filename)
+    
+    print("\n🔍 COMPREHENSIVE SEO AUDIT COMPLETE!")
+    print("\n📊 Data Points Captured:")
+    print("✅ Page load times & response sizes")
+    print("✅ Redirect chains & status codes")
+    print("✅ Content quality metrics (Flesch reading ease)")
+    print("✅ Duplicate content detection (titles, descriptions, H1s)")
+    print("✅ Published & modified dates from multiple sources")
+    print("✅ Language declarations & hreflang")
+    print("✅ Technical SEO (HTTPS, viewport, favicon, AMP)")
+    print("✅ Content structure (headings hierarchy)")
+    print("✅ Link analysis (internal/external, anchor text)")
+    print("✅ Image optimization (alt text, file sizes)")
+    print("✅ Social media tags completeness")
+    print("✅ Schema.org structured data")
+    print("✅ SEO issues & warnings auto-detection")
+    print("✅ Canonical URLs & self-referencing")
+    print("✅ Robots directives")
+    print("✅ Sitemap metadata (lastmod, priority, changefreq)")
+    print("\n💡 Pro tip: Sort by 'seo_issues' column to prioritize fixes!")
